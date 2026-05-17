@@ -66,7 +66,7 @@ export async function GET(request: Request) {
     { header: 'Sprat', key: 'floor', width: 7 },
     { header: 'Stan', key: 'apartment', width: 7 },
     { header: 'Posada', key: 'crew', width: 7 },
-    { header: 'Unos', key: 'carryIn', width: 6 },
+    { header: 'Potreban unos u stan', key: 'carryIn', width: 22 },
     { header: 'Vozilo', key: 'vehicle', width: 14 },
     { header: 'Artikli', key: 'items', width: 50 },
     { header: 'Status', key: 'status', width: 14 },
