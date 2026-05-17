@@ -55,6 +55,80 @@ function formatTimeRange(from: string, to: string): string {
   return from || to
 }
 
+function toMinutes(hhmm: string): number | null {
+  const m = hhmm.match(/^(\d{2}):(\d{2})$/)
+  if (!m) return null
+  return Number(m[1]) * 60 + Number(m[2])
+}
+
+function intervalFromForm(from: string, to: string): { fromMin: number; toMin: number } | null {
+  const f = toMinutes(from)
+  if (f == null) return null
+  const t = to ? toMinutes(to) : null
+  // Single time = 60-minute window (same convention as detectConflicts)
+  return { fromMin: f, toMin: t ?? f + 60 }
+}
+
+function intervalFromString(s: string | null): { fromMin: number; toMin: number } | null {
+  if (!s) return null
+  const range = s.trim().match(/^(\d{2}):(\d{2})\s*[–-]\s*(\d{2}):(\d{2})$/)
+  if (range) {
+    return {
+      fromMin: Number(range[1]) * 60 + Number(range[2]),
+      toMin: Number(range[3]) * 60 + Number(range[4]),
+    }
+  }
+  const single = s.trim().match(/^(\d{2}):(\d{2})$/)
+  if (single) {
+    const f = Number(single[1]) * 60 + Number(single[2])
+    return { fromMin: f, toMin: f + 60 }
+  }
+  return null
+}
+
+function detectFormWarnings(args: {
+  meId: string | null
+  date: string
+  timeFrom: string
+  timeTo: string
+  vehicleId: string | null
+  driverId: string | null
+  branchId: string | null
+  address: string
+  existing: ExistingDelivery[]
+}): string[] {
+  const out: string[] = []
+  const formInterval = intervalFromForm(args.timeFrom, args.timeTo)
+  const normAddr = args.address.trim().toLowerCase()
+
+  for (const ex of args.existing) {
+    if (ex.id === args.meId) continue
+    if (ex.date !== args.date) continue
+
+    const exInterval = intervalFromString(ex.deliveryTime)
+    const overlaps =
+      formInterval != null &&
+      exInterval != null &&
+      formInterval.fromMin < exInterval.toMin &&
+      exInterval.fromMin < formInterval.toMin
+
+    if (overlaps && args.vehicleId && args.vehicleId === ex.vehicleId) {
+      out.push(`Vozilo ${ex.vehicleName ?? '?'} se već koristi u dostavi #${ex.sequenceNumber} u istom terminu.`)
+    }
+    if (overlaps && args.driverId && args.driverId === ex.driverId) {
+      out.push(`Vozač ${ex.driverName ?? '?'} već vozi dostavu #${ex.sequenceNumber} u istom terminu.`)
+    }
+    if (overlaps && args.branchId && args.branchId === ex.branchId) {
+      out.push(`Poslovnica ${ex.branchName ?? '?'} već šalje dostavu #${ex.sequenceNumber} u istom terminu.`)
+    }
+    if (normAddr && ex.customerAddress && normAddr === ex.customerAddress.trim().toLowerCase()) {
+      out.push(`Dostava #${ex.sequenceNumber} ima istu adresu na isti dan.`)
+    }
+  }
+
+  return out
+}
+
 export type DeliveryDraft = {
   id: string
   date: string
@@ -116,6 +190,20 @@ const STATUS_LABELS: Record<DeliveryStatus, string> = {
   rescheduled: 'Preraspoređeno',
 }
 
+export type ExistingDelivery = {
+  id: string
+  sequenceNumber: number
+  date: string
+  deliveryTime: string | null
+  vehicleId: string | null
+  vehicleName: string | null
+  driverId: string | null
+  driverName: string | null
+  branchId: string | null
+  branchName: string | null
+  customerAddress: string | null
+}
+
 type Props = {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -125,6 +213,7 @@ type Props = {
   products: ProductOption[]
   vehicles: VehicleOption[]
   drivers: DriverOption[]
+  existingDeliveries: ExistingDelivery[]
 }
 
 function makeKey() {
@@ -143,6 +232,7 @@ export function DeliveryFormDialog({
   products,
   vehicles,
   drivers,
+  existingDeliveries,
 }: Props) {
   const isEdit = Boolean(delivery)
   const action = isEdit ? updateDelivery : createDelivery
@@ -151,6 +241,7 @@ export function DeliveryFormDialog({
     undefined,
   )
 
+  const [date, setDate] = useState<string>(delivery?.date ?? defaultDate)
   const [channel, setChannel] = useState<'branch' | 'web'>(delivery?.channel ?? 'branch')
   const [branchId, setBranchId] = useState<string>(delivery?.branchId ?? '')
   const [vehicleId, setVehicleId] = useState<string>(delivery?.vehicleId ?? '')
@@ -162,6 +253,22 @@ export function DeliveryFormDialog({
   const initTime = parseTimeRange(delivery?.deliveryTime)
   const [timeFrom, setTimeFrom] = useState(initTime.from)
   const [timeTo, setTimeTo] = useState(initTime.to)
+
+  const warnings = useMemo(
+    () =>
+      detectFormWarnings({
+        meId: delivery?.id ?? null,
+        date,
+        timeFrom,
+        timeTo,
+        vehicleId: vehicleId || null,
+        driverId: driverId || null,
+        branchId: branchId || null,
+        address,
+        existing: existingDeliveries,
+      }),
+    [delivery?.id, date, timeFrom, timeTo, vehicleId, driverId, branchId, address, existingDeliveries],
+  )
   const combinedTime = formatTimeRange(timeFrom, timeTo)
   const [items, setItems] = useState<ItemRow[]>(() =>
     delivery
@@ -230,13 +337,25 @@ export function DeliveryFormDialog({
           <input type="hidden" name="longitude" value={longitude ?? ''} />
           <input type="hidden" name="itemsJson" value={JSON.stringify(itemsForSubmit)} />
 
+          {warnings.length > 0 ? (
+            <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              <div className="mb-1 font-medium">Upozorenja</div>
+              <ul className="list-disc space-y-0.5 pl-5">
+                {warnings.map((w, i) => (
+                  <li key={i}>{w}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <FormField
               label="Datum"
               name="date"
               type="date"
               required
-              defaultValue={delivery?.date ?? defaultDate}
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
               errors={fieldErrors?.date}
             />
 

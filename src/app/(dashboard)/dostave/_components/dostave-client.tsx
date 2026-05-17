@@ -285,6 +285,19 @@ export function DostaveClient({ date, deliveries, branches, products, vehicles, 
         products={products}
         vehicles={vehicles}
         drivers={drivers}
+        existingDeliveries={deliveries.map((d) => ({
+          id: d.id,
+          sequenceNumber: d.sequenceNumber,
+          date: d.date,
+          deliveryTime: d.deliveryTime,
+          vehicleId: d.vehicleId,
+          vehicleName: d.vehicleName,
+          driverId: d.driverId,
+          driverName: d.driverName,
+          branchId: d.branchId,
+          branchName: branches.find((b) => b.id === d.branchId)?.name ?? null,
+          customerAddress: d.customerAddress,
+        }))}
       />
     </>
   )
