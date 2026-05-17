@@ -170,10 +170,10 @@ export function DeliveryRow({ delivery, onEdit }: Props) {
             </div>
 
             <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm text-muted-foreground">
-              {delivery.customerAddress ? (
+              {formatAddressLine(delivery) ? (
                 <span className="inline-flex items-center gap-1">
                   <MapPin className="size-3.5" />
-                  {delivery.customerAddress}
+                  {formatAddressLine(delivery)}
                 </span>
               ) : null}
               <span className="inline-flex items-center gap-1">
@@ -327,4 +327,13 @@ export function DeliveryRow({ delivery, onEdit }: Props) {
       </Dialog>
     </>
   )
+}
+
+function formatAddressLine(d: DeliveryRowData): string {
+  const parts: string[] = []
+  if (d.customerAddress) parts.push(d.customerAddress)
+  if (d.customerHouseNumber) parts.push(`br. ${d.customerHouseNumber}`)
+  if (d.customerFloor) parts.push(`sprat ${d.customerFloor}`)
+  if (d.customerApartmentNumber) parts.push(`stan ${d.customerApartmentNumber}`)
+  return parts.join(', ')
 }

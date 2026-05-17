@@ -94,11 +94,14 @@ model Delivery {
   vehicleId        String?
   driverId         String?
   sequenceNumber   Int
-  customerName     String
-  customerAddress  String?
-  customerPhone    String?
-  latitude         Float?
-  longitude        Float?
+  customerName            String
+  customerAddress         String?
+  customerHouseNumber     String?
+  customerFloor           String?
+  customerApartmentNumber String?
+  customerPhone           String?
+  latitude                Float?
+  longitude               Float?
   deliveryTime     String?
   carryInRequired  Boolean  @default(false)
   crewSizeRequired Int      @default(1)

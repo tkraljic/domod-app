@@ -131,7 +131,14 @@ export async function GET(request: Request) {
         time: d.deliveryTime ?? '',
         customer: d.customerName,
         phone: d.customerPhone ?? '',
-        address: d.customerAddress ?? '',
+        address: [
+          d.customerAddress,
+          d.customerHouseNumber ? `br. ${d.customerHouseNumber}` : null,
+          d.customerFloor ? `sprat ${d.customerFloor}` : null,
+          d.customerApartmentNumber ? `stan ${d.customerApartmentNumber}` : null,
+        ]
+          .filter(Boolean)
+          .join(', '),
         crew: d.crewSizeRequired,
         carryIn: d.carryInRequired ? 'Da' : '',
         vehicle: d.vehicle?.name ?? '',

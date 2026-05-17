@@ -64,6 +64,9 @@ export type DeliveryDraft = {
   driverId: string | null
   customerName: string
   customerAddress: string | null
+  customerHouseNumber: string | null
+  customerFloor: string | null
+  customerApartmentNumber: string | null
   customerPhone: string | null
   latitude: number | null
   longitude: number | null
@@ -343,6 +346,30 @@ export function DeliveryFormDialog({
             {fieldErrors?.customerAddress ? (
               <p className="text-xs text-red-600">{fieldErrors.customerAddress[0]}</p>
             ) : null}
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            <FormField
+              label="Broj"
+              name="customerHouseNumber"
+              defaultValue={delivery?.customerHouseNumber ?? ''}
+              errors={fieldErrors?.customerHouseNumber}
+              placeholder="npr. 12a"
+            />
+            <FormField
+              label="Sprat"
+              name="customerFloor"
+              defaultValue={delivery?.customerFloor ?? ''}
+              errors={fieldErrors?.customerFloor}
+              placeholder="npr. 3"
+            />
+            <FormField
+              label="Stan (opciono)"
+              name="customerApartmentNumber"
+              defaultValue={delivery?.customerApartmentNumber ?? ''}
+              errors={fieldErrors?.customerApartmentNumber}
+              placeholder="npr. 7"
+            />
           </div>
 
           <div>

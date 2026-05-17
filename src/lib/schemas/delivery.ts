@@ -31,6 +31,9 @@ const DeliveryBaseSchema = z.object({
   driverId: z.string().optional().or(z.literal('')),
   customerName: z.string().trim().min(1, 'Ime kupca je obavezno').max(200),
   customerAddress: z.string().trim().max(300).optional().or(z.literal('')),
+  customerHouseNumber: z.string().trim().max(20).optional().or(z.literal('')),
+  customerFloor: z.string().trim().max(20).optional().or(z.literal('')),
+  customerApartmentNumber: z.string().trim().max(20).optional().or(z.literal('')),
   customerPhone: z.string().trim().max(30).optional().or(z.literal('')),
   latitude: z
     .union([z.literal(''), z.coerce.number().min(-90).max(90)])
