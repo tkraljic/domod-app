@@ -1,0 +1,160 @@
+
+
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Users ───────────────────────────────────────────────────────────────────
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  fullName     String
+  role         String   @default("viewer") // admin | planner | driver | viewer
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  createdDeliveries  Delivery[] @relation("CreatedBy")
+  updatedDeliveries  Delivery[] @relation("UpdatedBy")
+  assignedDeliveries Delivery[] @relation("AssignedDriver")
+  auditLogs          AuditLog[]
+}
+
+// ─── Product Catalog ─────────────────────────────────────────────────────────
+
+model ProductCategory {
+  id        String   @id @default(cuid())
+  nameBs    String
+  nameEn    String?
+  parentId  String?
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  parent   ProductCategory?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children ProductCategory[] @relation("CategoryTree")
+  products Product[]
+}
+
+model Product {
+  id              String    @id @default(cuid())
+  sku             String    @unique
+  nameBs          String
+  nameEn          String?
+  categoryId      String
+  brand           String?
+  supplier        String?
+  lengthCm        Float?
+  widthCm         Float?
+  heightCm        Float?
+  weightKg        Float?
+  carryInDefault  Boolean   @default(false)
+  crewSizeDefault Int       @default(1)
+  notes           String?
+  deletedAt       DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  category      ProductCategory @relation(fields: [categoryId], references: [id])
+  deliveryItems DeliveryItem[]
+}
+
+// ─── Branches ─────────────────────────────────────────────────────────────────
+
+model Branch {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  address   String?
+  phone     String?
+  isWeb     Boolean  @default(false)
+  active    Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  deliveries Delivery[]
+}
+
+// ─── Deliveries ───────────────────────────────────────────────────────────────
+
+model Delivery {
+  id               String   @id @default(cuid())
+  date             DateTime
+  channel          String   // "branch" | "web"
+  branchId         String?
+  vehicleId        String?
+  driverId         String?
+  sequenceNumber   Int
+  customerName     String
+  customerAddress  String?
+  customerPhone    String?
+  latitude         Float?
+  longitude        Float?
+  deliveryTime     String?
+  carryInRequired  Boolean  @default(false)
+  crewSizeRequired Int      @default(1)
+  status           String   @default("planned") // planned | in_transit | delivered | failed | rescheduled
+  notes            String?
+  createdById      String
+  updatedById      String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  branch    Branch?        @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  vehicle   Vehicle?       @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
+  driver    User?          @relation("AssignedDriver", fields: [driverId], references: [id])
+  createdBy User           @relation("CreatedBy", fields: [createdById], references: [id])
+  updatedBy User?          @relation("UpdatedBy", fields: [updatedById], references: [id])
+  items     DeliveryItem[]
+
+  @@unique([date, channel, sequenceNumber])
+}
+
+model DeliveryItem {
+  id         String  @id @default(cuid())
+  deliveryId String
+  productId  String
+  quantity   Int     @default(1)
+  notes      String?
+
+  delivery Delivery @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+  product  Product  @relation(fields: [productId], references: [id])
+}
+
+// ─── Vehicles ─────────────────────────────────────────────────────────────────
+
+model Vehicle {
+  id        String   @id @default(cuid())
+  name      String
+  payloadKg Float
+  volumeM3  Float
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  deliveries Delivery[]
+}
+
+// ─── Audit Log ────────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  entityType String
+  entityId   String
+  action     String   // create | update | delete
+  userId     String
+  changes    String   // JSON string
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+}
