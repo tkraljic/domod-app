@@ -1,7 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { Prisma } from '@/generated/prisma/client'
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { verifySession } from '@/lib/session'
 import { writeAudit } from '@/lib/audit'

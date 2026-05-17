@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
-import { Prisma } from '@/generated/prisma/client'
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { verifySession } from '@/lib/session'
 import { Input } from '@/components/ui/input'
