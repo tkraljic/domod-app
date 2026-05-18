@@ -1,24 +1,26 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { Fragment, useState, useTransition } from 'react'
 import {
+  AlertTriangle,
   ChevronDown,
   ChevronRight,
   MoreHorizontal,
+  PackageCheck,
   Pencil,
   Trash2,
-  PackageCheck,
-  Users,
-  Clock,
-  Phone,
-  MapPin,
-  Truck,
-  User,
-  AlertTriangle,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,14 +30,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
+import { TableCell, TableRow } from '@/components/ui/table'
 import {
   deleteDelivery,
   updateDeliveryStatus,
@@ -57,6 +52,8 @@ export type DeliveryRowData = DeliveryDraft & {
     notes: string | null
   }[]
 }
+
+export const DELIVERY_TABLE_COLUMN_COUNT = 11
 
 type Props = {
   delivery: DeliveryRowData
@@ -86,6 +83,25 @@ function formatConflict(c: Conflict): string {
   return `Vozilo ${c.vehicleName} preopterećeno (težina ${c.weightPct}%, volumen ${c.volumePct}%).`
 }
 
+function formatAddressLine(d: DeliveryRowData): string {
+  const parts: string[] = []
+  if (d.customerAddress) parts.push(d.customerAddress)
+  if (d.customerHouseNumber) parts.push(`br. ${d.customerHouseNumber}`)
+  if (d.customerFloor) parts.push(`sprat ${d.customerFloor}`)
+  if (d.customerApartmentNumber) parts.push(`stan ${d.customerApartmentNumber}`)
+  return parts.join(', ')
+}
+
+function formatItemsSummary(items: DeliveryRowData['itemsDetail']): string {
+  if (items.length === 0) return '—'
+  const head = items
+    .slice(0, 2)
+    .map((it) => `${it.nameBs} ×${it.quantity}`)
+    .join(', ')
+  if (items.length <= 2) return head
+  return `${head} (+${items.length - 2})`
+}
+
 export function DeliveryRow({ delivery, onEdit }: Props) {
   const [expanded, setExpanded] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -111,203 +127,185 @@ export function DeliveryRow({ delivery, onEdit }: Props) {
     })
   }
 
-  const itemsSummary = delivery.itemsDetail
-    .map((it) => `${it.nameBs} ×${it.quantity}`)
-    .join(', ')
-
   const conflictMessages = delivery.conflicts.map(formatConflict)
   const hasConflicts = conflictMessages.length > 0
+  const itemsSummary = formatItemsSummary(delivery.itemsDetail)
+  const addressLine = formatAddressLine(delivery)
+  const rowTint = hasConflicts ? 'bg-amber-50/60 hover:bg-amber-50' : ''
 
   return (
-    <>
-      <div
-        className={[
-          'rounded-lg border bg-card',
-          hasConflicts ? 'border-amber-300 ring-1 ring-amber-200' : '',
-        ].join(' ')}
-      >
-        <div className="flex items-start gap-3 px-3 py-2.5">
-          <button
-            type="button"
-            onClick={() => setExpanded((e) => !e)}
-            className="mt-0.5 text-muted-foreground hover:text-foreground"
-            aria-label={expanded ? 'Sažmi' : 'Proširi'}
-          >
-            {expanded ? (
-              <ChevronDown className="size-4" />
-            ) : (
-              <ChevronRight className="size-4" />
-            )}
-          </button>
-
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-              <span className="font-mono text-sm font-medium tabular-nums">
-                #{delivery.sequenceNumber}
-              </span>
-              {hasConflicts ? (
-                <span
-                  className="inline-flex items-center gap-1 rounded-md bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-800"
-                  title={conflictMessages.join('\n')}
-                >
-                  <AlertTriangle className="size-3" />
-                  Konflikt
-                </span>
-              ) : null}
-              {delivery.deliveryTime ? (
-                <span className="inline-flex items-center gap-1 text-sm text-muted-foreground">
-                  <Clock className="size-3.5" />
-                  {delivery.deliveryTime}
-                </span>
-              ) : null}
-              <span className="font-medium">{delivery.customerName}</span>
-              {delivery.customerPhone ? (
-                <span className="inline-flex items-center gap-1 text-sm text-muted-foreground">
-                  <Phone className="size-3.5" />
-                  {delivery.customerPhone}
-                </span>
-              ) : null}
-            </div>
-
-            <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm text-muted-foreground">
-              {formatAddressLine(delivery) ? (
-                <span className="inline-flex items-center gap-1">
-                  <MapPin className="size-3.5" />
-                  {formatAddressLine(delivery)}
-                </span>
-              ) : null}
-              <span className="inline-flex items-center gap-1">
-                <Users className="size-3.5" />
-                {delivery.crewSizeRequired}
-              </span>
-              {delivery.vehicleName ? (
-                <span className="inline-flex items-center gap-1 text-foreground">
-                  <Truck className="size-3.5" />
-                  {delivery.vehicleName}
-                </span>
-              ) : null}
-              {delivery.driverName ? (
-                <span className="inline-flex items-center gap-1 text-foreground">
-                  <User className="size-3.5" />
-                  {delivery.driverName}
-                </span>
-              ) : null}
-              {delivery.carryInRequired ? (
-                <span className="inline-flex items-center gap-1 text-foreground">
-                  <PackageCheck className="size-3.5" />
-                  Unos u stan
-                </span>
-              ) : null}
-            </div>
-
-            {!expanded && (
-              <p className="mt-1 truncate text-sm text-muted-foreground">{itemsSummary}</p>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2">
-            <DropdownMenu>
-              <DropdownMenuTrigger
-                render={
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className={`h-7 px-2 ${STATUS_CLASSES[delivery.status]}`}
-                    disabled={pending}
-                  >
-                    {STATUS_LABELS[delivery.status]}
-                    <ChevronDown className="ml-1 size-3" />
-                  </Button>
-                }
-              />
-              <DropdownMenuContent align="end">
-                <DropdownMenuGroup>
-                  <DropdownMenuLabel>Promijeni status</DropdownMenuLabel>
-                </DropdownMenuGroup>
-                <DropdownMenuSeparator />
-                {DELIVERY_STATUSES.map((s) => (
-                  <DropdownMenuItem
-                    key={s}
-                    onClick={() => handleStatus(s)}
-                    disabled={s === delivery.status}
-                  >
-                    {STATUS_LABELS[s]}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            <DropdownMenu>
-              <DropdownMenuTrigger
-                render={
-                  <Button variant="ghost" size="icon-sm" aria-label="Akcije">
-                    <MoreHorizontal className="size-4" />
-                  </Button>
-                }
-              />
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => onEdit(delivery)}>
-                  <Pencil className="mr-2 size-4" />
-                  Uredi
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  variant="destructive"
-                  onClick={() => setConfirmDelete(true)}
-                >
-                  <Trash2 className="mr-2 size-4" />
-                  Obriši
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </div>
-
-        {expanded && (
-          <div className="border-t bg-muted/20 px-4 py-2.5">
-            <ul className="space-y-1">
-              {delivery.itemsDetail.map((it, idx) => (
-                <li key={idx} className="flex items-start gap-3 text-sm">
-                  <span className="font-mono text-xs text-muted-foreground">{it.sku}</span>
-                  <span className="flex-1">{it.nameBs}</span>
-                  <span className="tabular-nums text-muted-foreground">×{it.quantity}</span>
-                  {it.notes ? (
-                    <Badge variant="outline" className="text-xs">
-                      {it.notes}
-                    </Badge>
-                  ) : null}
-                </li>
-              ))}
-            </ul>
+    <Fragment>
+      <TableRow className={rowTint} aria-expanded={expanded}>
+        <TableCell className="w-[1%] pr-2">
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => setExpanded((e) => !e)}
+              className="text-muted-foreground hover:text-foreground"
+              aria-label={expanded ? 'Sažmi' : 'Proširi'}
+            >
+              {expanded ? (
+                <ChevronDown className="size-4" />
+              ) : (
+                <ChevronRight className="size-4" />
+              )}
+            </button>
+            <span className="font-mono text-sm font-medium tabular-nums">
+              #{delivery.sequenceNumber}
+            </span>
             {hasConflicts ? (
-              <div className="mt-2 border-t pt-2">
-                <div className="flex items-center gap-1.5 text-xs font-medium text-amber-800">
-                  <AlertTriangle className="size-3.5" />
-                  Mogući konflikt:
-                </div>
-                <ul className="mt-1 ml-5 list-disc space-y-0.5 text-xs text-amber-800">
-                  {conflictMessages.map((m, i) => (
-                    <li key={i}>{m}</li>
-                  ))}
-                </ul>
-              </div>
-            ) : null}
-            {delivery.notes ? (
-              <p className="mt-2 border-t pt-2 text-sm text-muted-foreground">
-                <span className="font-medium text-foreground">Napomena:</span> {delivery.notes}
-              </p>
+              <span
+                title={conflictMessages.join('\n')}
+                className="inline-flex items-center text-amber-700"
+                aria-label="Konflikt"
+              >
+                <AlertTriangle className="size-3.5" />
+              </span>
             ) : null}
           </div>
-        )}
-      </div>
+        </TableCell>
+        <TableCell className="text-sm text-muted-foreground tabular-nums">
+          {delivery.deliveryTime ?? '—'}
+        </TableCell>
+        <TableCell className="font-medium">{delivery.customerName}</TableCell>
+        <TableCell className="text-sm text-muted-foreground">
+          {delivery.customerPhone ?? '—'}
+        </TableCell>
+        <TableCell className="text-sm">
+          <div className="flex items-center gap-1.5">
+            <span className="block max-w-[280px] truncate" title={addressLine || undefined}>
+              {addressLine || '—'}
+            </span>
+            {delivery.carryInRequired ? (
+              <span
+                title="Unos u stan"
+                className="inline-flex shrink-0 items-center text-emerald-700"
+                aria-label="Unos u stan"
+              >
+                <PackageCheck className="size-3.5" />
+              </span>
+            ) : null}
+          </div>
+        </TableCell>
+        <TableCell className="text-sm text-muted-foreground">
+          <span className="block max-w-[260px] truncate" title={itemsSummary}>
+            {itemsSummary}
+          </span>
+        </TableCell>
+        <TableCell className="text-center text-sm tabular-nums">
+          {delivery.crewSizeRequired}
+        </TableCell>
+        <TableCell className="text-sm">{delivery.vehicleName ?? '—'}</TableCell>
+        <TableCell className="text-sm">{delivery.driverName ?? '—'}</TableCell>
+        <TableCell className="w-[1%]">
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className={`h-7 px-2 ${STATUS_CLASSES[delivery.status]}`}
+                  disabled={pending}
+                >
+                  {STATUS_LABELS[delivery.status]}
+                  <ChevronDown className="ml-1 size-3" />
+                </Button>
+              }
+            />
+            <DropdownMenuContent align="end">
+              <DropdownMenuGroup>
+                <DropdownMenuLabel>Promijeni status</DropdownMenuLabel>
+              </DropdownMenuGroup>
+              <DropdownMenuSeparator />
+              {DELIVERY_STATUSES.map((s) => (
+                <DropdownMenuItem
+                  key={s}
+                  onClick={() => handleStatus(s)}
+                  disabled={s === delivery.status}
+                >
+                  {STATUS_LABELS[s]}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </TableCell>
+        <TableCell className="w-[1%] text-right">
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={
+                <Button variant="ghost" size="icon-sm" aria-label="Akcije">
+                  <MoreHorizontal className="size-4" />
+                </Button>
+              }
+            />
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => onEdit(delivery)}>
+                <Pencil className="mr-2 size-4" />
+                Uredi
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                variant="destructive"
+                onClick={() => setConfirmDelete(true)}
+              >
+                <Trash2 className="mr-2 size-4" />
+                Obriši
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </TableCell>
+      </TableRow>
+
+      {expanded ? (
+        <TableRow className={hasConflicts ? 'bg-amber-50/60' : 'bg-muted/20'}>
+          <TableCell colSpan={DELIVERY_TABLE_COLUMN_COUNT} className="whitespace-normal p-0">
+            <div className="px-4 py-2.5">
+              <ul className="space-y-1">
+                {delivery.itemsDetail.map((it, idx) => (
+                  <li key={idx} className="flex items-start gap-3 text-sm">
+                    <span className="font-mono text-xs text-muted-foreground">{it.sku}</span>
+                    <span className="flex-1">{it.nameBs}</span>
+                    <span className="tabular-nums text-muted-foreground">×{it.quantity}</span>
+                    {it.notes ? (
+                      <Badge variant="outline" className="text-xs">
+                        {it.notes}
+                      </Badge>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+              {hasConflicts ? (
+                <div className="mt-2 border-t pt-2">
+                  <div className="flex items-center gap-1.5 text-xs font-medium text-amber-800">
+                    <AlertTriangle className="size-3.5" />
+                    Mogući konflikt:
+                  </div>
+                  <ul className="mt-1 ml-5 list-disc space-y-0.5 text-xs text-amber-800">
+                    {conflictMessages.map((m, i) => (
+                      <li key={i}>{m}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+              {delivery.notes ? (
+                <p className="mt-2 border-t pt-2 text-sm text-muted-foreground">
+                  <span className="font-medium text-foreground">Napomena:</span>{' '}
+                  {delivery.notes}
+                </p>
+              ) : null}
+            </div>
+          </TableCell>
+        </TableRow>
+      ) : null}
 
       <Dialog open={confirmDelete} onOpenChange={setConfirmDelete}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Obrisati dostavu?</DialogTitle>
             <DialogDescription>
-              Trajno brišete dostavu #{delivery.sequenceNumber} za <strong>{delivery.customerName}</strong>.
-              Ova radnja se ne može poništiti.
+              Trajno brišete dostavu #{delivery.sequenceNumber} za{' '}
+              <strong>{delivery.customerName}</strong>. Ova radnja se ne može
+              poništiti.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -319,21 +317,17 @@ export function DeliveryRow({ delivery, onEdit }: Props) {
             >
               Odustani
             </Button>
-            <Button type="button" variant="destructive" onClick={handleDelete} disabled={pending}>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={pending}
+            >
               {pending ? 'Brisanje...' : 'Obriši'}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </>
+    </Fragment>
   )
-}
-
-function formatAddressLine(d: DeliveryRowData): string {
-  const parts: string[] = []
-  if (d.customerAddress) parts.push(d.customerAddress)
-  if (d.customerHouseNumber) parts.push(`br. ${d.customerHouseNumber}`)
-  if (d.customerFloor) parts.push(`sprat ${d.customerFloor}`)
-  if (d.customerApartmentNumber) parts.push(`stan ${d.customerApartmentNumber}`)
-  return parts.join(', ')
 }

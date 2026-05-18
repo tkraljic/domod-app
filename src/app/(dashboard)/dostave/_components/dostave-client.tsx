@@ -4,8 +4,11 @@ import { useMemo, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import {
   CalendarIcon,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ChevronsDownUp,
+  ChevronsUpDown,
   Download,
   Globe,
   Plus,
@@ -22,6 +25,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import {
+  Table,
+  TableBody,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 import {
   DeliveryFormDialog,
   type BranchOption,
@@ -64,6 +74,16 @@ export function DostaveClient({ date, deliveries, branches, products, vehicles, 
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<DeliveryDraft | null>(null)
   const [openCount, setOpenCount] = useState(0)
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(() => new Set())
+
+  function toggleSection(key: string) {
+    setCollapsedSections((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
 
   function setDate(next: string) {
     router.push(`${pathname}?date=${next}`)
@@ -129,6 +149,21 @@ export function DostaveClient({ date, deliveries, branches, products, vehicles, 
 
   const physicalBranches = branches.filter((b) => !b.isWeb)
   const stats = computeStats(deliveries)
+
+  const visibleSectionKeys: string[] = []
+  for (const b of physicalBranches) {
+    if ((byBranchId.get(b.id)?.length ?? 0) > 0) visibleSectionKeys.push(b.id)
+  }
+  if (webDeliveries.length > 0) visibleSectionKeys.push('web')
+  const allCollapsed =
+    visibleSectionKeys.length > 0 &&
+    visibleSectionKeys.every((k) => collapsedSections.has(k))
+  const webCollapsed = collapsedSections.has('web')
+
+  function toggleAllSections() {
+    if (allCollapsed) setCollapsedSections(new Set())
+    else setCollapsedSections(new Set(visibleSectionKeys))
+  }
 
   return (
     <>
@@ -198,6 +233,21 @@ export function DostaveClient({ date, deliveries, branches, products, vehicles, 
         </Select>
 
         <div className="ml-auto flex items-center gap-2">
+          {visibleSectionKeys.length > 0 ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={toggleAllSections}
+              aria-pressed={allCollapsed}
+            >
+              {allCollapsed ? (
+                <ChevronsUpDown className="mr-1 size-4" />
+              ) : (
+                <ChevronsDownUp className="mr-1 size-4" />
+              )}
+              {allCollapsed ? 'Proširi sve' : 'Sažmi sve'}
+            </Button>
+          ) : null}
           <Button
             variant="outline"
             render={<a href={`/api/export/dostave?date=${date}`} download />}
@@ -241,37 +291,72 @@ export function DostaveClient({ date, deliveries, branches, products, vehicles, 
           {physicalBranches.map((branch) => {
             const rows = byBranchId.get(branch.id) ?? []
             if (rows.length === 0) return null
+            const isCollapsed = collapsedSections.has(branch.id)
             return (
-              <section key={branch.id}>
-                <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold">
+              <section key={branch.id} className="rounded-lg border bg-card">
+                <button
+                  type="button"
+                  onClick={() => toggleSection(branch.id)}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-semibold hover:bg-muted/40"
+                  aria-expanded={!isCollapsed}
+                >
+                  {isCollapsed ? (
+                    <ChevronRight className="size-4 text-muted-foreground" />
+                  ) : (
+                    <ChevronDown className="size-4 text-muted-foreground" />
+                  )}
                   <Store className="size-4 text-muted-foreground" />
                   <span className="font-mono text-xs text-muted-foreground">{branch.code}</span>
-                  {branch.name}
+                  <span>{branch.name}</span>
                   <span className="text-muted-foreground">· {rows.length}</span>
-                </h2>
-                <div className="space-y-2">
-                  {rows.map((d) => (
-                    <DeliveryRow key={d.id} delivery={d} onEdit={openEdit} />
-                  ))}
-                </div>
+                </button>
+                {!isCollapsed ? (
+                  <Table>
+                    <TableHeader>
+                      <DeliveryTableHeaderRow />
+                    </TableHeader>
+                    <TableBody>
+                      {rows.map((d) => (
+                        <DeliveryRow key={d.id} delivery={d} onEdit={openEdit} />
+                      ))}
+                    </TableBody>
+                  </Table>
+                ) : null}
               </section>
             )
           })}
 
-          {webDeliveries.length > 0 && (
-            <section>
-              <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold">
+          {webDeliveries.length > 0 ? (
+            <section className="rounded-lg border bg-card">
+              <button
+                type="button"
+                onClick={() => toggleSection('web')}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-semibold hover:bg-muted/40"
+                aria-expanded={!webCollapsed}
+              >
+                {webCollapsed ? (
+                  <ChevronRight className="size-4 text-muted-foreground" />
+                ) : (
+                  <ChevronDown className="size-4 text-muted-foreground" />
+                )}
                 <Globe className="size-4 text-muted-foreground" />
-                Web narudžbe
+                <span>Web narudžbe</span>
                 <span className="text-muted-foreground">· {webDeliveries.length}</span>
-              </h2>
-              <div className="space-y-2">
-                {webDeliveries.map((d) => (
-                  <DeliveryRow key={d.id} delivery={d} onEdit={openEdit} />
-                ))}
-              </div>
+              </button>
+              {!webCollapsed ? (
+                <Table>
+                  <TableHeader>
+                    <DeliveryTableHeaderRow />
+                  </TableHeader>
+                  <TableBody>
+                    {webDeliveries.map((d) => (
+                      <DeliveryRow key={d.id} delivery={d} onEdit={openEdit} />
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : null}
             </section>
-          )}
+          ) : null}
         </div>
       )}
 
@@ -400,6 +485,24 @@ function LoadBar({
         />
       </div>
     </div>
+  )
+}
+
+function DeliveryTableHeaderRow() {
+  return (
+    <TableRow>
+      <TableHead className="w-[1%]">#</TableHead>
+      <TableHead>Vrijeme</TableHead>
+      <TableHead>Kupac</TableHead>
+      <TableHead>Telefon</TableHead>
+      <TableHead>Adresa</TableHead>
+      <TableHead>Artikli</TableHead>
+      <TableHead className="text-center">Pos.</TableHead>
+      <TableHead>Vozilo</TableHead>
+      <TableHead>Vozač</TableHead>
+      <TableHead>Status</TableHead>
+      <TableHead className="w-[1%]" />
+    </TableRow>
   )
 }
 
