@@ -30,6 +30,29 @@ async function main() {
     },
   })
 
+  // ─── Drivers (vozači) ──────────────────────────────────────────────────────
+  const driverHash = await bcrypt.hash('vozac123', 12)
+  const drivers = [
+    { email: 'edin.hasanovic@domod.ba', fullName: 'Edin Hasanović' },
+    { email: 'mirsad.begic@domod.ba', fullName: 'Mirsad Begić' },
+    { email: 'adnan.mehmedovic@domod.ba', fullName: 'Adnan Mehmedović' },
+    { email: 'senad.kovacevic@domod.ba', fullName: 'Senad Kovačević' },
+    { email: 'haris.delic@domod.ba', fullName: 'Haris Delić' },
+  ]
+
+  for (const d of drivers) {
+    await prisma.user.upsert({
+      where: { email: d.email },
+      update: {},
+      create: {
+        email: d.email,
+        passwordHash: driverHash,
+        fullName: d.fullName,
+        role: 'driver',
+      },
+    })
+  }
+
   // ─── Branches ──────────────────────────────────────────────────────────────
   const branches = [
     { code: 'SRJ', name: 'Sarajevo', address: 'Sarajevo', sortOrder: 1 },
